@@ -5,12 +5,12 @@ from ann import generate_classifier, ngram_simple_classifier
 
 ngram_size = 2
 batch_size = 1
-split_threshold = -1
+# split_threshold = -1
 rounding_threshold = 0.5
-feature_ratio_threshold = 0.2
+# feature_ratio_threshold = 0.2
 epochs_number = 25
-num_of_extra_evaluations = 0
-
+# num_of_extra_evaluations = 0
+hidden_layer_to_input_size_ratio = 0.5
 
 def show_ratios(fraud, normal, keys):
     mal_counter = dict()
@@ -148,55 +148,47 @@ def evaluate(fraud, benign, key_to_index, unknown):
 
 def main():
     dc = DataCenter()
-    print("loading data...")
-    dc.load_all_raw_data()
-    print("generating substitution...")
-    dc.generate_substitution()
-    print("loading labels...")
-    dc.load_labels(dc.raw_data)
+    dc.initialize(ngrams_size=ngram_size, hidden_layer_to_input_size_ratio=0.5, )
 
-    # feature extraction
-    print("generating ngrams (" + str(ngram_size) + ")")
-    dc.generate_ngrams(ngram_size)
-    informative_keys = show_ratios(dc.labeled_ngrams_fraud, dc.labeled_ngrams_normal, dc.all_ngrams)
-    key_to_index = dict()
-    for i in range(len(informative_keys)):
-        key_to_index[informative_keys[i]] = i
+    normal_sessions = dc.all_data['raw_data'][:dc.num_of_benign_sessions_per_user]
+    all_users_ngrams = dc.all_ngrams['ngrams']
 
-    # print(key_to_index)
-    for i in range(num_of_extra_evaluations):
-        evaluate(dc.labeled_ngrams_fraud, dc.labeled_ngrams_normal, key_to_index, dc.labeled_ngrams_unknown)
+    autoencoders = list()
+    for user_ngrams, i in zip(all_users_ngrams, range(len(all_users_ngrams))):
+        autoencoders.append(generate_user_autoencoder(num_of_keys=len(all_users_ngrams[i]), hidden_layer_size= hidden_layer_to_input_size_ratio * len(all_users_ngrams[i])))
 
-    (classifier, unknown) = evaluate(dc.labeled_ngrams_fraud, dc.labeled_ngrams_normal, key_to_index, dc.labeled_ngrams_unknown)
-
-    predictions = round_predictions(classifier.predict(np.array(unknown)))
-    # print(len(predictions))
-    # print(predictions)
-    csv = [','.join(np.array(predictions[i:i+100]).astype(str)) for i in range(30)]
-    csv = '\n'.join(csv)
-    print(csv)
-    # print(dc.labeled_data_normal[0])
-    # print(dc.labeled_ngrams_normal[0])
-    # print(dc.all_ngrams)
+    for session, ae in zip(normal_sessions, autoencoders):
+        ae.train(session, session)
 
 
-
-    # print("saving files")
-    # dc.save_labeled_data("Data/Labeled_Raw_Data/")
-
-    # print("pre processing...")
-    # dc.vectorize_all()
-
-    # print("fitting autoencoder...")
-    # dc.train_encoder()
-
-    # print("compressing data...")
-    # dc.compress_all_labeled_data()
+    # print("loading data...")
+    # dc.load_all_raw_data()
+    # print("generating substitution...")
+    # dc.generate_substitution()
+    # print("loading labels...")
+    # dc.load_labels(dc.raw_data)
     #
-    # print("train classifier")
-    # dc.train_classifier()
+    # # feature extraction
+    # print("generating ngrams (" + str(ngram_size) + ")")
+    # dc.generate_self_ngrams(ngram_size)
+    # informative_keys = show_ratios(dc.labeled_ngrams_fraud, dc.labeled_ngrams_normal, dc.all_ngrams)
+    # key_to_index = dict()
+    # for i in range(len(informative_keys)):
+    #     key_to_index[informative_keys[i]] = i
     #
-    # print('done')
+    # # print(key_to_index)
+    # for i in range(num_of_extra_evaluations):
+    #     evaluate(dc.labeled_ngrams_fraud, dc.labeled_ngrams_normal, key_to_index, dc.labeled_ngrams_unknown)
+    #
+    # (classifier, unknown) = evaluate(dc.labeled_ngrams_fraud, dc.labeled_ngrams_normal, key_to_index, dc.labeled_ngrams_unknown)
+    #
+    # predictions = round_predictions(classifier.predict(np.array(unknown)))
+    #
+    # csv = [','.join(np.array(predictions[i:i+100]).astype(str)) for i in range(30)]
+    # csv = '\n'.join(csv)
+    # print(csv)
+
+
 
 
 if __name__ == "__main__":

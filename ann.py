@@ -1,5 +1,5 @@
 from keras.models import Model
-from keras.layers import Input, Dense, LSTM, Activation
+from keras.layers import Input, Dense, Activation
 
 
 def generate_autoencoder(input_shape, hidden_layer_size):
@@ -46,4 +46,3 @@ def ngram_simple_classifier(num_of_keys):
     model = Model(input_img, output_layer)
     model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
     return model
-

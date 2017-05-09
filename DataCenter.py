@@ -4,7 +4,7 @@ import csv
 from keras.models import Model, Sequential
 from keras.layers import Input, Dense
 
-from ann import generate_autoencoder, generate_classifier
+from ann import *
 
 
 class DataCenter:
@@ -14,6 +14,7 @@ class DataCenter:
     raw_data_filename = "User"
     raw_data_num_of_files = 40
     num_of_partitions = 150
+    num_of_benign_sessions_per_user = 50
 
     compressed_sample_size = 5
     num_of_sample_per_partition = 100
@@ -132,54 +133,72 @@ class DataCenter:
         users_raw_data = list()
         for i in range(0, self.raw_data_num_of_files):
             users_raw_data.append(self.load_raw_data(i))
-        self.raw_data = self.flatten_list(users_raw_data)
         return users_raw_data
 
-    def generate_substitution(self):
-        word_set = set()
-        for section in self.raw_data:
-            for word in section:
-                word_set.add(word)
-        word_list = list(word_set)
-        word_list.sort()
-        for i in range(0, len(word_list)):
-            self.substitution[word_list[i]] = i
+    # def generate_substitution(self):
+    #     word_set = set()
+    #     for section in self.raw_data:
+    #         for word in section:
+    #             word_set.add(word)
+    #     word_list = list(word_set)
+    #     word_list.sort()
+    #     for i in range(0, len(word_list)):
+    #         self.substitution[word_list[i]] = i
+    #
+    #     return self.substitution
+
+    # def vectorize_single(self, word, key_to_index):
+    #     vec = np.zeros(len(self.substitution.keys()))
+    #     vec[self.substitution[word]] = 1.0
+    #     return vec
+    #
+    # def vectorize_all(self, data, key_to_index):
+    #     for section in self.raw_data:
+    #         processed_section = []
+    #         for word in section:
+    #             processed_section.append(self.vectorize_single(word))
+    #         self.vectorized_data.append(processed_section)
+    #
+    #     return
+
+    def generate_key_substitution(self, keys):
+        sub = dict()
+        for i in range(0, len(keys)):
+            self.substitution[keys[i]] = i
 
         return self.substitution
 
-    def vectorize_single(self, word):
-        vec = np.zeros(len(self.substitution.keys()))
-        vec[self.substitution[word]] = 1.0
-        return vec
-
-    def vectorize_all(self, data):
-        for section in self.raw_data:
-            processed_section = []
-            for word in section:
-                processed_section.append(self.vectorize_single(word))
-            self.vectorized_data.append(processed_section)
-
-        return
-
-    def calculate_ngrams_from_features(self, data, n):
+    def vectorize_user_sessions(self, data, key_to_index):
         new_data = list()
-        for sect in data:
-            new_sect = list()
-            for i in range(0, len(sect) - n):
-                ngram = ','.join(sect[i:i+n])
-                if ngram not in self.all_ngrams:
-                    self.all_ngrams.append(ngram)
-                    # print(ngram)
+        n = len(key_to_index.keys())
+        for section in data:
+            vec = np.zeros(n)
+            for word in section:
+                if word in key_to_index.keys():
+                    vec[key_to_index[word]] += 1.0
+            new_data.append(vec)
+        return new_data
 
-                new_sect.append(ngram)
-            new_data.append(new_sect)
-        return new_data;
+    def calculate_ngrams_from_wordlist(self, wordlist, n):
+        all_ngrams = set()
+        for i in range(0, len(wordlist) - n):
+                ngram = ','.join(wordlist[i:i+n])
+                all_ngrams.add(ngram)
 
-    def generate_ngrams(self, n):
-        self.labeled_ngrams_fraud = self.calculate_ngrams_from_features(self.labeled_data_fraud, n)
-        self.labeled_ngrams_normal = self.calculate_ngrams_from_features(self.labeled_data_normal, n)
-        self.labeled_ngrams_unknown = self.calculate_ngrams_from_features(self.labeled_data_unknown, n)
-        return
+        return all_ngrams
+
+    def user_sessions_to_ngrams(self, user_sessions, n):
+        user_ngrams = list()
+        for session in user_sessions:
+            session_as_ngrams = self.calculate_ngrams_from_wordlist(session, n)
+            user_ngrams.append(session_as_ngrams)
+        return user_ngrams, set(self.flatten_list(user_ngrams))
+
+    # def generate_self_ngrams(self, n):
+    #     self.labeled_ngrams_fraud = self.calculate_ngrams_from_features(self.labeled_data_fraud, n)
+    #     self.labeled_ngrams_normal = self.calculate_ngrams_from_features(self.labeled_data_normal, n)
+    #     self.labeled_ngrams_unknown = self.calculate_ngrams_from_features(self.labeled_data_unknown, n)
+    #     return
 
     # def save_file(self, index, label, data, path):
     #     data_file = open(path + label + "/" + str(index), 'w')
@@ -191,41 +210,93 @@ class DataCenter:
     #     data_file.close()
     #     return
 
-    def load_labels(self, data_to_label):
-        with open(self.labels_file_path, "rt") as f:
-            reader = csv.reader(f, delimiter=",")
-            index = 0
-            for row in enumerate(reader):
-                for label in row[1]:
-                    if label == str(0):
-                        self.labeled_data_normal.append(np.array(data_to_label[index]))
-                    elif label == str(1):
-                        self.labeled_data_fraud.append(np.array(data_to_label[index]))
-                    else:
-                        self.labeled_data_unknown.append(np.array(data_to_label[index]))
-                    index += 1
-                    # print(str(index) + ":\t\t" + label)
-        return
+    def attach_labels(self, all_users_sessions):
+        all_users_labeled_sessions = list()
 
-    # def save_labeled_data(self, path):
-    #     index = 0;
-    #
-    #     for sample in self.labeled_data_normal:
-    #         print(
-    #             "saving file " + str(index + 1) + " out of " + str(self.raw_data_num_of_files * self.num_of_partitions) + "(normal)")
-    #         self.save_file(index, "normal", sample, path)
-    #         index += 1
-    #
-    #     for sample in self.labeled_data_fraud:
-    #         print(
-    #             "saving file " + str(index + 1) + " out of " + str(self.raw_data_num_of_files * self.num_of_partitions) + "(fraud)")
-    #         self.save_file(index, "fraud", sample, path)
-    #         index += 1
-    #
-    #     for sample in self.labeled_data_unknown:
-    #         print(
-    #             "saving file " + str(index + 1) + " out of " + str(self.raw_data_num_of_files * self.num_of_partitions) + "(unknown)")
-    #         self.save_file(index, "unknown", sample, path)
-    #         index += 1
-    #
+        with open(self.labels_file_path, "rt") as f:
+            rows = enumerate(csv.reader(f, delimiter=","))
+
+            for row, user in zip(rows, all_users_sessions):
+                single_user_labeled_sessions = list()
+                for label, session in zip(row[1], user):
+                    if label == str(0):
+                        label = 'normal'
+                    elif label == str(1):
+                        label = 'fraud'
+                    else:
+                        label = 'unknown'
+
+                    labeled_session = dict()
+                    labeled_session['label'] = label
+                    labeled_session['data'] = session
+
+                    single_user_labeled_sessions.append(labeled_session)
+
+                all_users_labeled_sessions.append(single_user_labeled_sessions)
+
+        return all_users_labeled_sessions
+
+    # def load_labels(self, data_to_label):
+    #     with open(self.labels_file_path, "rt") as f:
+    #         reader = csv.reader(f, delimiter=",")
+    #         index = 0
+    #         for row in enumerate(reader):
+    #             for label in row[1]:
+    #                 if label == str(0):
+    #                     self.labeled_data_normal.append(np.array(data_to_label[index]))
+    #                 elif label == str(1):
+    #                     self.labeled_data_fraud.append(np.array(data_to_label[index]))
+    #                 else:
+    #                     self.labeled_data_unknown.append(np.array(data_to_label[index]))
+    #                 index += 1
+    #                 # print(str(index) + ":\t\t" + label)
     #     return
+    #
+    # # def save_labeled_data(self, path):
+    # #     index = 0;
+    # #
+    # #     for sample in self.labeled_data_normal:
+    # #         print(
+    # #             "saving file " + str(index + 1) + " out of " + str(self.raw_data_num_of_files * self.num_of_partitions) + "(normal)")
+    # #         self.save_file(index, "normal", sample, path)
+    # #         index += 1
+    # #
+    # #     for sample in self.labeled_data_fraud:
+    # #         print(
+    # #             "saving file " + str(index + 1) + " out of " + str(self.raw_data_num_of_files * self.num_of_partitions) + "(fraud)")
+    # #         self.save_file(index, "fraud", sample, path)
+    # #         index += 1
+    # #
+    # #     for sample in self.labeled_data_unknown:
+    # #         print(
+    # #             "saving file " + str(index + 1) + " out of " + str(self.raw_data_num_of_files * self.num_of_partitions) + "(unknown)")
+    # #         self.save_file(index, "unknown", sample, path)
+    # #         index += 1
+    # #
+    # #     return
+
+    def initialize(self, ngrams_size, hidden_layer_to_input_size_ratio):
+        # load data
+        raw_data = self.load_all_raw_data()
+        self.all_data['raw'] = raw_data
+
+        # load labeles
+        labeled_data = self.attach_labels(raw_data)
+        self.all_data['labeled'] = labeled_data
+
+        # generate ngrams and substitutions
+        all_users_ngrams = list()
+        all_users_substitutions = list()
+
+        for user in raw_data:
+            (user_sessions_as_ngrams, all_user_ngrams) = self.user_sessions_to_ngrams(list(user_word_set), ngrams_size)
+            all_users_ngrams.append(user_sessions_as_ngrams)
+            all_users_substitutions.append(self.generate_key_substitution(all_user_ngrams))
+        self.all_data['users_sessions_as_ngrams'] = all_users_ngrams
+        self.all_ngrams['substitutions'] = all_users_substitutions
+
+        
+
+        all_users_processed_ngrams = list()
+
+        return
