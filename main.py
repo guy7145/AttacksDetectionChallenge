@@ -12,7 +12,7 @@ rounding_threshold = 0.5
 # feature_ratio_threshold = 0.2
 epochs_number = 100
 # num_of_extra_evaluations = 0
-hidden_layer_to_input_size_ratio = 0.3
+hidden_layer_to_input_size_ratio = 0.2
 
 encoder_training_start_printout_prefix = "---------------------------------------------------"
 
@@ -233,7 +233,7 @@ def main():
 
     num_of_tested_users = 10
     print("evaluating... ({})".format(num_of_tested_users))
-    ae_delta_prediction_threshold = 4.75
+    ae_delta_prediction_threshold = 4.85
     scores = list()
     max_score = 0
     opt_threshold = 0
@@ -252,7 +252,7 @@ def main():
             max_score = average_score
             opt_threshold = ae_delta_prediction_threshold
 
-        ae_delta_prediction_threshold += 0.005
+        ae_delta_prediction_threshold += 0.001
 
     print("average scores: {}".format(scores))
     print("max score: {} ; opt threshold: {}".format(max_score, opt_threshold))
