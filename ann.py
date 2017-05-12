@@ -27,10 +27,10 @@ def generate_classifier(input_shape):
     return model
 
 
-def generate_user_autoencoder(num_of_keys, hidden_layer_size):
+def generate_user_autoencoder_classifier(num_of_keys, hidden_layer_size):
     input_img = Input(shape=(num_of_keys,))
-    hidden_layer = Dense(shape=(hidden_layer_size,))(input_img)
-    output_layer = Dense(units=1, activation='sigmoid')(hidden_layer)
+    hidden_layer = Dense(units=hidden_layer_size)(input_img)
+    output_layer = Dense(units=num_of_keys, activation='sigmoid')(hidden_layer)
 
     model = Model(input_img, output_layer)
     model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])

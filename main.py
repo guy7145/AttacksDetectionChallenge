@@ -1,5 +1,7 @@
 import random
 
+import math
+
 from DataCenter import *
 from ann import generate_classifier, ngram_simple_classifier
 
@@ -8,9 +10,13 @@ batch_size = 1
 # split_threshold = -1
 rounding_threshold = 0.5
 # feature_ratio_threshold = 0.2
-epochs_number = 25
+epochs_number = 60
 # num_of_extra_evaluations = 0
-hidden_layer_to_input_size_ratio = 0.5
+hidden_layer_to_input_size_ratio = 0.3
+ae_delta_prediction_threshold = 1
+
+encoder_training_start_printout_prefix = "---------------------------------------------------"
+
 
 def show_ratios(fraud, normal, keys):
     mal_counter = dict()
@@ -146,19 +152,112 @@ def evaluate(fraud, benign, key_to_index, unknown):
     return classifier, unknown
 
 
+def ae_predictions(ae, xs, threshold):
+    final_predictions = list();
+
+    deltas = list()
+    reconstructions = ae.predict(np.array(xs))
+    for x, r in zip(xs, reconstructions):
+        delta_vec = [(vx - vr)**2 for vx,vr in zip(x, r)]
+        delta = 0
+        for d in delta_vec:
+            delta += d
+        delta = math.sqrt(delta)
+        deltas.append(delta)
+
+    for d in deltas:
+        if d > threshold:
+            final_predictions.append(1)
+        else:
+            final_predictions.append(0)
+        # print("delta: {}".format(d))
+
+    return final_predictions
+
+
+def evaluate_autoencoder(ae, xs, ys, threshold):
+
+    tp = tn = fp = fn = 0
+    predicted = ae_predictions(ae, xs, threshold)
+    negatives = positives = 0
+    # print(predicted)
+    for i in range(len(xs)):
+        if ys[i] == 0 and predicted[i] == 0:
+            tn += 1
+            negatives += 1
+        elif ys[i] == 0 and predicted[i] == 1:
+            fp += 1
+            negatives += 1
+        elif ys[i] == 1 and predicted[i] == 0:
+            fn += 1
+            positives += 1
+        elif ys[i] == 1 and predicted[i] == 1:
+            tp += 1
+            positives += 1
+
+    print("tp: {}; fn: {}; tn: {}; fp: {}".format(tp, fn, tn, fp))
+    print("score: {}".format(9*tp + fp))
+    print("test data size: {} positives; {} negatives; total: {}".format(positives, negatives, positives + negatives))
+
+    return 9*tp + tn
+
+
 def main():
+    print("initializing dc...")
     dc = DataCenter()
-    dc.initialize(ngrams_size=ngram_size, hidden_layer_to_input_size_ratio=0.5, )
+    dc.initialize(ngrams_size=ngram_size)
 
-    normal_sessions = dc.all_data['raw_data'][:dc.num_of_benign_sessions_per_user]
-    all_users_ngrams = dc.all_ngrams['ngrams']
+    normal_sessions = dc.all_data['raw'][:dc.num_of_benign_sessions_per_user]
+    all_users_ngrams = dc.all_data['all_users_session_ngrams_processed']
 
+    # num_of_autoencoders = len(all_users_ngrams)
+    num_of_autoencoders = 10
+    print("generating auto encoders... ({})".format(num_of_autoencoders))
     autoencoders = list()
-    for user_ngrams, i in zip(all_users_ngrams, range(len(all_users_ngrams))):
-        autoencoders.append(generate_user_autoencoder(num_of_keys=len(all_users_ngrams[i]), hidden_layer_size= hidden_layer_to_input_size_ratio * len(all_users_ngrams[i])))
+    for user_ngrams, i in zip(all_users_ngrams, range(num_of_autoencoders)):
+        nok = len(dc.all_data['all_users_substitutions'][i].keys())
+        print("input_img size = {}".format(nok))
+        ae = generate_user_autoencoder_classifier(num_of_keys=nok, hidden_layer_size=int(hidden_layer_to_input_size_ratio * nok))
+        autoencoders.append(ae)
 
-    for session, ae in zip(normal_sessions, autoencoders):
-        ae.train(session, session)
+    print("training auto encoders... ({})".format(num_of_autoencoders))
+    i = 1;
+    for user_ngrams, ae in zip(all_users_ngrams, autoencoders):
+        print("{} {}/{}".format(encoder_training_start_printout_prefix, i, num_of_autoencoders))
+        i += 1
+        user_ngrams = np.array(user_ngrams)
+        ae.fit(user_ngrams, user_ngrams, epochs=epochs_number, batch_size=batch_size, verbose=2, shuffle=True)
+
+    num_of_tested_users = 10
+    print("evaluating... ({})".format(num_of_tested_users))
+    ae_delta_prediction_threshold = 0.75
+    scores = list()
+    max_score = 0
+    opt_threshold = 0
+    print("evaluating")
+    for k in range(20):
+        average_score = 0;
+        print("{}: threshold={}".format(k, ae_delta_prediction_threshold))
+        for i in range(num_of_tested_users):
+            labeled_sessions = dc.all_data['labeled'][i]
+            xs = [ls['data'] for ls in labeled_sessions]
+            ys = [ls['label'] for ls in labeled_sessions]
+            average_score += evaluate_autoencoder(autoencoders[i], xs, ys, ae_delta_prediction_threshold)
+        average_score = average_score/num_of_tested_users
+        scores.append(average_score)
+        if average_score >= max_score:
+            max_score = average_score
+            opt_threshold = ae_delta_prediction_threshold
+
+        ae_delta_prediction_threshold += 0.0025
+
+    print("average scores: {}".format(scores))
+    print("max score: {} ; opt threshold: {}".format(max_score, opt_threshold))
+
+    return
+
+    # for user_sessions in dc.all_data['all_users_session_ngrams_processed']:
+    #     print(user_sessions)
 
 
     # print("loading data...")
@@ -187,9 +286,6 @@ def main():
     # csv = [','.join(np.array(predictions[i:i+100]).astype(str)) for i in range(30)]
     # csv = '\n'.join(csv)
     # print(csv)
-
-
-
 
 if __name__ == "__main__":
     main()

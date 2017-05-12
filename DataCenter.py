@@ -38,13 +38,7 @@ class DataCenter:
     encoder = 0
 
     def __init__(self):
-        input_img = Input(shape=(765,))
-        encoded = Dense(100, activation='relu')(input_img)
-        decoded = Dense(765, activation='sigmoid')(encoded)
-        self.encoder_decoder = Model(input_img, decoded)
-        self.encoder = Model(input_img, encoded)
 
-        self.encoder_decoder.compile(optimizer='adadelta', loss='binary_crossentropy')
         return
 
     @staticmethod
@@ -126,8 +120,8 @@ class DataCenter:
         raw_data = list()
         with open(self.raw_data_dir_path + self.raw_data_filename + str(i)) as datafile:
             lines = [line.rstrip('\n') for line in datafile.readlines()]
-            raw_data.extend(self.user_to_user_sessions(lines))
-        return raw_data
+            raw_data.extend(lines)
+        return list(self.user_to_user_sessions(raw_data))
 
     def load_all_raw_data(self):
         users_raw_data = list()
@@ -164,9 +158,8 @@ class DataCenter:
     def generate_key_substitution(self, keys):
         sub = dict()
         for i in range(0, len(keys)):
-            self.substitution[keys[i]] = i
-
-        return self.substitution
+            sub[keys[i]] = i
+        return sub
 
     def vectorize_user_sessions(self, data, key_to_index):
         new_data = list()
@@ -184,15 +177,14 @@ class DataCenter:
         for i in range(0, len(wordlist) - n):
                 ngram = ','.join(wordlist[i:i+n])
                 all_ngrams.add(ngram)
-
-        return all_ngrams
+        return list(all_ngrams)
 
     def user_sessions_to_ngrams(self, user_sessions, n):
         user_ngrams = list()
         for session in user_sessions:
             session_as_ngrams = self.calculate_ngrams_from_wordlist(session, n)
             user_ngrams.append(session_as_ngrams)
-        return user_ngrams, set(self.flatten_list(user_ngrams))
+        return user_ngrams
 
     # def generate_self_ngrams(self, n):
     #     self.labeled_ngrams_fraud = self.calculate_ngrams_from_features(self.labeled_data_fraud, n)
@@ -220,9 +212,9 @@ class DataCenter:
                 single_user_labeled_sessions = list()
                 for label, session in zip(row[1], user):
                     if label == str(0):
-                        label = 'normal'
+                        label = 0
                     elif label == str(1):
-                        label = 'fraud'
+                        label = 1
                     else:
                         label = 'unknown'
 
@@ -275,28 +267,30 @@ class DataCenter:
     # #
     # #     return
 
-    def initialize(self, ngrams_size, hidden_layer_to_input_size_ratio):
+    def initialize(self, ngrams_size):
         # load data
         raw_data = self.load_all_raw_data()
         self.all_data['raw'] = raw_data
 
-        # load labeles
-        labeled_data = self.attach_labels(raw_data)
-        self.all_data['labeled'] = labeled_data
-
         # generate ngrams and substitutions
-        all_users_ngrams = list()
+        all_users_sessions_ngrams = list()
+        all_users_session_ngrams_processed = list()
         all_users_substitutions = list()
 
         for user in raw_data:
-            (user_sessions_as_ngrams, all_user_ngrams) = self.user_sessions_to_ngrams(list(user_word_set), ngrams_size)
-            all_users_ngrams.append(user_sessions_as_ngrams)
-            all_users_substitutions.append(self.generate_key_substitution(all_user_ngrams))
-        self.all_data['users_sessions_as_ngrams'] = all_users_ngrams
-        self.all_ngrams['substitutions'] = all_users_substitutions
+            user_sessions_as_ngrams = self.user_sessions_to_ngrams(user, ngrams_size)
+            all_user_ngrams = list(set(self.flatten_list(user_sessions_as_ngrams[:self.num_of_benign_sessions_per_user])))
+            all_users_sessions_ngrams.append(user_sessions_as_ngrams)
+            substitution = self.generate_key_substitution(all_user_ngrams)
+            all_users_substitutions.append(substitution)
+            all_users_session_ngrams_processed.append(self.vectorize_user_sessions(user_sessions_as_ngrams, substitution))
 
-        
+        self.all_data['all_users_sessions_ngrams'] = all_users_sessions_ngrams
+        self.all_data['all_users_session_ngrams_processed'] = all_users_session_ngrams_processed
+        self.all_data['all_users_substitutions'] = all_users_substitutions
 
-        all_users_processed_ngrams = list()
+        # load labeles
+        labeled_data = self.attach_labels(all_users_session_ngrams_processed)
+        self.all_data['labeled'] = labeled_data
 
         return
