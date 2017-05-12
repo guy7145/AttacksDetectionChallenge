@@ -10,10 +10,9 @@ batch_size = 1
 # split_threshold = -1
 rounding_threshold = 0.5
 # feature_ratio_threshold = 0.2
-epochs_number = 60
+epochs_number = 100
 # num_of_extra_evaluations = 0
 hidden_layer_to_input_size_ratio = 0.3
-ae_delta_prediction_threshold = 1
 
 encoder_training_start_printout_prefix = "---------------------------------------------------"
 
@@ -210,11 +209,15 @@ def main():
     normal_sessions = dc.all_data['raw'][:dc.num_of_benign_sessions_per_user]
     all_users_ngrams = dc.all_data['all_users_session_ngrams_processed']
 
+    training_set = list()
+    for user in all_users_ngrams:
+        training_set.append(user[:50])
+
     # num_of_autoencoders = len(all_users_ngrams)
-    num_of_autoencoders = 10
+    num_of_autoencoders = 40
     print("generating auto encoders... ({})".format(num_of_autoencoders))
     autoencoders = list()
-    for user_ngrams, i in zip(all_users_ngrams, range(num_of_autoencoders)):
+    for i in range(num_of_autoencoders):
         nok = len(dc.all_data['all_users_substitutions'][i].keys())
         print("input_img size = {}".format(nok))
         ae = generate_user_autoencoder_classifier(num_of_keys=nok, hidden_layer_size=int(hidden_layer_to_input_size_ratio * nok))
@@ -222,7 +225,7 @@ def main():
 
     print("training auto encoders... ({})".format(num_of_autoencoders))
     i = 1;
-    for user_ngrams, ae in zip(all_users_ngrams, autoencoders):
+    for user_ngrams, ae in zip(training_set, autoencoders):
         print("{} {}/{}".format(encoder_training_start_printout_prefix, i, num_of_autoencoders))
         i += 1
         user_ngrams = np.array(user_ngrams)
@@ -230,18 +233,18 @@ def main():
 
     num_of_tested_users = 10
     print("evaluating... ({})".format(num_of_tested_users))
-    ae_delta_prediction_threshold = 0.75
+    ae_delta_prediction_threshold = 4.75
     scores = list()
     max_score = 0
     opt_threshold = 0
     print("evaluating")
-    for k in range(20):
+    for k in range(50):
         average_score = 0;
         print("{}: threshold={}".format(k, ae_delta_prediction_threshold))
         for i in range(num_of_tested_users):
             labeled_sessions = dc.all_data['labeled'][i]
-            xs = [ls['data'] for ls in labeled_sessions]
-            ys = [ls['label'] for ls in labeled_sessions]
+            xs = [ls['data'] for ls in labeled_sessions][50:]
+            ys = [ls['label'] for ls in labeled_sessions][50:]
             average_score += evaluate_autoencoder(autoencoders[i], xs, ys, ae_delta_prediction_threshold)
         average_score = average_score/num_of_tested_users
         scores.append(average_score)
@@ -249,10 +252,16 @@ def main():
             max_score = average_score
             opt_threshold = ae_delta_prediction_threshold
 
-        ae_delta_prediction_threshold += 0.0025
+        ae_delta_prediction_threshold += 0.005
 
     print("average scores: {}".format(scores))
     print("max score: {} ; opt threshold: {}".format(max_score, opt_threshold))
+
+    for i in range(num_of_tested_users, 40):
+        labeled_sessions = dc.all_data['labeled'][i]
+        xs = [ls['data'] for ls in labeled_sessions][50:]
+        predictions = ae_predictions(autoencoders[i], xs, opt_threshold)
+        print(",".join([str(p) for p in predictions]))
 
     return
 
