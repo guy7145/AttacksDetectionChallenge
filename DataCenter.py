@@ -275,19 +275,22 @@ class DataCenter:
         # generate ngrams and substitutions
         all_users_sessions_ngrams = list()
         all_users_session_ngrams_processed = list()
-        all_users_substitutions = list()
+        all_keys = list()
 
         for user in raw_data:
             user_sessions_as_ngrams = self.user_sessions_to_ngrams(user, ngrams_size)
             all_user_ngrams = list(set(self.flatten_list(user_sessions_as_ngrams[:self.num_of_benign_sessions_per_user])))
             all_users_sessions_ngrams.append(user_sessions_as_ngrams)
-            substitution = self.generate_key_substitution(all_user_ngrams)
-            all_users_substitutions.append(substitution)
-            all_users_session_ngrams_processed.append(self.vectorize_user_sessions(user_sessions_as_ngrams, substitution))
+            all_keys.extend(all_user_ngrams)
+        all_keys = list(set(all_keys))
+
+        sub = self.generate_key_substitution(all_keys)
+        for user in all_users_sessions_ngrams:
+            all_users_session_ngrams_processed.append(self.vectorize_user_sessions(user, sub))
 
         self.all_data['all_users_sessions_ngrams'] = all_users_sessions_ngrams
         self.all_data['all_users_session_ngrams_processed'] = all_users_session_ngrams_processed
-        self.all_data['all_users_substitutions'] = all_users_substitutions
+        self.all_data['substitution'] = sub
 
         # load labeles
         labeled_data = self.attach_labels(all_users_session_ngrams_processed)
