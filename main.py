@@ -172,7 +172,7 @@ def main():
     print("max score: {} ; opt threshold: {}".format(max_score, opt_threshold))
 
     for user in unknown_set:
-        xs = [ls['data'] for ls in user]
+        xs = user
         predictions = ae_predictions(ae, xs, opt_threshold)
         print(",".join([str(p) for p in predictions]))
 
