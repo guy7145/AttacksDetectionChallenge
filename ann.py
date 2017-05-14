@@ -1,5 +1,5 @@
 from keras.models import Model
-from keras.layers import Input, Dense, Activation
+from keras.layers import Input, Dense, Activation, LSTM
 
 
 def generate_autoencoder(input_shape, hidden_layer_size):
@@ -29,7 +29,10 @@ def generate_classifier(input_shape):
 
 def generate_user_autoencoder_classifier(num_of_keys, hidden_layer_size):
     input_img = Input(shape=(num_of_keys,))
-    hidden_layer = Dense(units=hidden_layer_size)(input_img)
+    hidden_layer = LSTM(units=hidden_layer_size, activation='tanh', recurrent_activation='hard_sigmoid', use_bias=True,
+                        kernel_initializer='glorot_uniform', recurrent_initializer='orthogonal',
+                        bias_initializer='zeros')(input_img)
+    hidden_layer = Dense(units=hidden_layer_size)(hidden_layer)
     output_layer = Dense(units=num_of_keys, activation='sigmoid')(hidden_layer)
 
     model = Model(input_img, output_layer)
