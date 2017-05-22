@@ -14,16 +14,17 @@ def generate_autoencoder(input_shape, hidden_layer_size):
     return encoder, autoencoder
 
 
-def generate_classifier(input_shape):
-    print("input shape: " + str(input_shape))
-    input_img = Input(shape=input_shape)
-    hidden_layer = Dense(units=500, activation='relu')(input_img)
-    hidden_layer = Dense(units=250, activation='relu')(hidden_layer)
-    output_layer = Dense(units=1, activation='softmax')(hidden_layer)
+def generate_classifier(num_of_keys, ratio):
+    print("input size: {}; ratio: {}".format(num_of_keys, ratio))
+    input_img = Input(shape=(num_of_keys, ))
+    hidden_layer = Dense(units=int(num_of_keys * ratio), activation='relu')(input_img)
+    # hidden_layer = Dense(units=int(num_of_keys * ratio), activation='relu')(hidden_layer)
+    # hidden_layer = Dense(units=2, activation='softmax')(hidden_layer)
+    output_layer = Dense(units=1, activation='sigmoid')(hidden_layer)
 
     model = Model(input_img, output_layer)
     model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
-    print("model generated!")
+    # print("model generated!")
     return model
 
 
