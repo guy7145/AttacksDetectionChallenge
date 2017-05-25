@@ -1,5 +1,5 @@
 from keras.models import Model
-from keras.layers import Input, Dense, Activation
+from keras.layers import Input, Dense, Activation, Dropout
 
 
 def generate_autoencoder(input_shape, hidden_layer_size):
@@ -17,33 +17,12 @@ def generate_autoencoder(input_shape, hidden_layer_size):
 def generate_classifier(num_of_keys, ratio):
     print("input size: {}; ratio: {}".format(num_of_keys, ratio))
     input_img = Input(shape=(num_of_keys, ))
-    hidden_layer = Dense(units=int(num_of_keys * ratio), activation='relu')(input_img)
-    # hidden_layer = Dense(units=int(num_of_keys * ratio), activation='relu')(hidden_layer)
-    # hidden_layer = Dense(units=2, activation='softmax')(hidden_layer)
-    output_layer = Dense(units=1, activation='sigmoid')(hidden_layer)
-
-    model = Model(input_img, output_layer)
-    model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
-    # print("model generated!")
-    return model
-
-
-def generate_user_autoencoder_classifier(num_of_keys, hidden_layer_size):
-    input_img = Input(shape=(num_of_keys,))
-    hidden_layer = Dense(units=hidden_layer_size)(input_img)
-    output_layer = Dense(units=num_of_keys, activation='sigmoid')(hidden_layer)
-
-    model = Model(input_img, output_layer)
-    model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
-    return model
-
-
-def ngram_simple_classifier(num_of_keys):
-    input_img = Input(shape=(num_of_keys,))
-    # act = Activation('relu')(input_img)
-    # hidden_layer = Dense(units=int(num_of_keys/2), activation='relu')(input_img)
+    hidden_layer = Dense(units=int(num_of_keys * ratio), activation='linear')(input_img)
+    # hidden_layer = Dense(units=int(num_of_keys * ratio / 2), activation='linear')(hidden_layer)
+    # hidden_layer = Dense(units=int(num_of_keys * ratio / 3), activation='linear')(hidden_layer)
     output_layer = Dense(units=1, activation='sigmoid')(input_img)
 
     model = Model(input_img, output_layer)
     model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
+    # print("model generated!")
     return model

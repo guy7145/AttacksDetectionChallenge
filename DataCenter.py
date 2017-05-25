@@ -168,7 +168,7 @@ class DataCenter:
             vec = np.zeros(n)
             for word in section:
                 if word in key_to_index.keys():
-                    vec[key_to_index[word]] += 1.0
+                    vec[key_to_index[word]] = 1.0
             new_data.append(vec)
         return new_data
 
@@ -183,26 +183,10 @@ class DataCenter:
         user_ngrams = list()
         for session in user_sessions:
             session_as_ngrams = self.calculate_ngrams_from_wordlist(session, n)
-            for i in range(2, n):
-                session_as_ngrams.extend(self.calculate_ngrams_from_wordlist(session, i))
+            # for i in range(2, n):
+            #     session_as_ngrams.extend(self.calculate_ngrams_from_wordlist(session, i))
             user_ngrams.append(session_as_ngrams)
         return user_ngrams
-
-    # def generate_self_ngrams(self, n):
-    #     self.labeled_ngrams_fraud = self.calculate_ngrams_from_features(self.labeled_data_fraud, n)
-    #     self.labeled_ngrams_normal = self.calculate_ngrams_from_features(self.labeled_data_normal, n)
-    #     self.labeled_ngrams_unknown = self.calculate_ngrams_from_features(self.labeled_data_unknown, n)
-    #     return
-
-    # def save_file(self, index, label, data, path):
-    #     data_file = open(path + label + "/" + str(index), 'w')
-    #     for vec in data:
-    #         for vi in vec:
-    #             data_file.write(str(vi))
-    #             data_file.write(',')
-    #         data_file.write('\n')
-    #     data_file.close()
-    #     return
 
     def attach_labels(self, all_users_sessions):
         all_users_labeled_sessions = list()
@@ -229,45 +213,6 @@ class DataCenter:
                 all_users_labeled_sessions.append(single_user_labeled_sessions)
 
         return all_users_labeled_sessions
-
-    # def load_labels(self, data_to_label):
-    #     with open(self.labels_file_path, "rt") as f:
-    #         reader = csv.reader(f, delimiter=",")
-    #         index = 0
-    #         for row in enumerate(reader):
-    #             for label in row[1]:
-    #                 if label == str(0):
-    #                     self.labeled_data_normal.append(np.array(data_to_label[index]))
-    #                 elif label == str(1):
-    #                     self.labeled_data_fraud.append(np.array(data_to_label[index]))
-    #                 else:
-    #                     self.labeled_data_unknown.append(np.array(data_to_label[index]))
-    #                 index += 1
-    #                 # print(str(index) + ":\t\t" + label)
-    #     return
-    #
-    # # def save_labeled_data(self, path):
-    # #     index = 0;
-    # #
-    # #     for sample in self.labeled_data_normal:
-    # #         print(
-    # #             "saving file " + str(index + 1) + " out of " + str(self.raw_data_num_of_files * self.num_of_partitions) + "(normal)")
-    # #         self.save_file(index, "normal", sample, path)
-    # #         index += 1
-    # #
-    # #     for sample in self.labeled_data_fraud:
-    # #         print(
-    # #             "saving file " + str(index + 1) + " out of " + str(self.raw_data_num_of_files * self.num_of_partitions) + "(fraud)")
-    # #         self.save_file(index, "fraud", sample, path)
-    # #         index += 1
-    # #
-    # #     for sample in self.labeled_data_unknown:
-    # #         print(
-    # #             "saving file " + str(index + 1) + " out of " + str(self.raw_data_num_of_files * self.num_of_partitions) + "(unknown)")
-    # #         self.save_file(index, "unknown", sample, path)
-    # #         index += 1
-    # #
-    # #     return
 
     def initialize(self, ngrams_size):
         # load data
